@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Générateur de Plans - Routing Magnétique</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background-color: #f4f6f9; }
+        #control-panel { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; }
+        .input-group { display: flex; flex-direction: column; gap: 5px; }
+        input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 200px; font-size: 14px; }
+        .btn { padding: 10px 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.8; }
+        .btn:disabled { opacity: 0.5; cursor: wait; }
+        
+        .btn-red { background: #d32f2f; color: white; }
+        .btn-green { background: #2e7d32; color: white; }
+        .btn-blue { background: #1565c0; color: white; }
+        .btn-orange { background: #ff6b00; color: white; }
+        .btn-purple { background: #8e24aa; color: white; }
+        .btn-pink { background: #e91e63; color: white; }
+        .btn-validate { background: #009688; color: white; border: 2px solid #00796b; }
+        .btn-cancel { background: #757575; color: white; }
+        .btn-export { background: #ffb300; color: #000; margin-left: auto; font-size: 14px; }
+        
+        #help-tip { width: 100%; background: #e3f2fd; border-left: 4px solid #1e88e5; padding: 8px 12px; font-size: 13px; color: #0d47a1; border-radius: 0 4px 4px 0; margin-top: -5px; }
+        #export-container { width: 1024px; height: 768px; margin: 0 auto; background: #104169; padding: 15px; box-sizing: border-box; border-radius: 4px; box-shadow: 0 10px 20px rgba(0,0,0,0.15); }
+        #banner { width: 100%; height: 90px; background: #104169; color: white; border: 3px solid white; box-sizing: border-box; }
+        .banner-table { display: table; width: 100%; height: 100%; }
+        .banner-cell { display: table-cell; vertical-align: middle; }
+        .banner-left { width: 140px; padding-left: 15px; text-align: left; }
+        .banner-center { text-align: center; }
+        .banner-right { width: 140px; }
+        #logo-cea { height: 60px; background: white; padding: 4px; border-radius: 4px; display: inline-block; }
+        #banner-text h1 { margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
+        #banner-text h2 { margin: 3px 0 0 0; font-size: 16px; font-weight: 400; text-transform: uppercase; color: #ffeb3b; }
+        #map-wrapper { position: relative; width: 100%; height: 610px; margin-top: 13px; border: 3px solid white; box-sizing: border-box; }
+        #map { width: 100%; height: 100%; background: #cbd5e1; cursor: default; }
+        
+        #legend-box { display: none; position: absolute; bottom: 20px; right: 20px; background: white; border: 2px solid #104169; padding: 12px; border-radius: 4px; z-index: 1000; width: 215px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        .legend-item { display: flex; align-items: center; margin-bottom: 7px; font-size: 11px; font-weight: bold; }
+        .legend-color { width: 30px; height: 6px; margin-right: 10px; border-radius: 2px; }
+        .legend-icon { width: 20px; height: 20px; margin-right: 15px; display: flex; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body>
+
+    <div id="control-panel">
+        <div class="input-group">
+            <label>Route / Commune :</label>
+            <input type="text" id="input-line1" value="D1004 - WASSELONNE" oninput="updateBanner()">
+        </div>
+        <div class="input-group">
+            <label>Nature du chantier :</label>
+            <input type="text" id="input-line2" value="TRAVAUX D'ENROBÉS DE NUIT" oninput="updateBanner()">
+        </div>
+        
+        <div class="input-group" style="flex-direction: row; align-items: flex-end; gap: 6px;">
+            <button class="btn btn-red" onclick="startDraw('Chantier', '#d32f2f', 7)">+ Chantier</button>
+            <button class="btn btn-green" onclick="startDraw('PP', '#2e7d32', 5)">+ Déviation PP</button>
+            <button class="btn btn-blue" onclick="startDraw('SEC', '#1565c0', 5)">+ Déviation SEC</button>
+            <button class="btn btn-orange" onclick="startDraw('VL1', '#ff6b00', 5)">+ Déviation VL 1</button>
+            <button class="btn btn-purple" onclick="startDraw('VL2', '#8e24aa', 5)">+ Déviation VL 2</button>
+            <button class="btn btn-pink" onclick="startDraw('PL', '#e91e63', 5)">+ Déviation PL</button>
+            
+            <span style="border-left: 2px solid #ccc; margin: 0 4px; height: 35px;"></span>
+            
+            <button class="btn btn-validate" onclick="finishDraw()">✔️ Terminer le tracé</button>
+            <button class="btn btn-cancel" onclick="stopDraw()">❌ Annuler</button>
+        </div>
+
+        <button class="btn btn-export" onclick="exportPlan()">💾 Exporter Image (PNG)</button>
+        
+        <div id="help-tip">
+            <strong>🖱️ Magnétisme Actif :</strong> Cliquez sur vos points de passage, le tracé suit automatiquement les routes. Validez avec <strong>✔️ Terminer</strong>.
+        </div>
+    </div>
+
+    <div id="export-container">
+        <div id="banner">
+            <div class="banner-table">
+                <div class="banner-cell banner-left">
+                    <img id="logo-cea" src="cea-logo-rvb-vertical-fond-blanc.png" alt="Logo CeA" onerror="this.style.display='none';">
+                </div>
+                <div class="banner-cell banner-center" id="banner-text">
+                    <h1 id="text-line1">D1004 - WASSELONNE</h1>
+                    <h2 id="text-line2">TRAVAUX D'ENROBÉS DE NUIT</h2>
+                </div>
+                <div class="banner-cell banner-right"></div>
+            </div>
+        </div>
+
+        <div id="map-wrapper">
+            <div id="map"></div>
+            <div id="legend-box">
+                <h3 style="margin: 0 0 10px 0; font-size: 14px; text-align: center; border-bottom: 2px solid #104169; padding-bottom: 3px;">Légende</h3>
+                <div id="legend-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const map = L.map('map', { preferCanvas: true }).setView([48.6375, 7.4481], 13);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19, attribution: '© OpenStreetMap', crossOrigin: true
+        }).addTo(map);
+
+        let isDrawing = false;
+        let isFetchingRoute = false;
+        let currentType = '';
+        let currentOptions = {};
+        
+        let lastPoint = null;
+        let currentPathLatLngs = []; // Stocke tous les points de la ligne en cours
+        let activePolylineLayer = null; // Couche visuelle temporaire
+
+        const drawnCounters = { Chantier: 0, PP: 0, SEC: 0, VL1: 0, VL2: 0, PL: 0 };
+
+        const sensInterditIcon = L.divIcon({
+            className: 'custom-icon',
+            html: '<div style="width:20px; height:20px; background:#da291c; border-radius:50%; border: 2px solid white; display:flex; align-items:center; justify-content:center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"><div style="width:14px; height:3.5px; background:white;"></div></div>',
+            iconSize: [20, 20], iconAnchor: [10, 10]
+        });
+
+        const legendDefinitions = {
+            Chantier: '<div class="legend-item" id="leg-Chantier"><div class="legend-icon"><div style="width:16px; height:16px; background:#da291c; border-radius:50%; display:flex; align-items:center; justify-content:center;"><div style="width:11px; height:2.5px; background:white;"></div></div></div> Zone de chantier barrée</div>',
+            PP: '<div class="legend-item" id="leg-PP"><div class="legend-color" style="background:#2e7d32;"></div> Déviation principale (PP)</div>',
+            SEC: '<div class="legend-item" id="leg-SEC"><div class="legend-color" style="background:#1565c0;"></div> Déviation secondaire (SEC)</div>',
+            VL1: '<div class="legend-item" id="leg-VL1"><div class="legend-color" style="background:#ff6b00;"></div> Déviation VL 1</div>',
+            VL2: '<div class="legend-item" id="leg-VL2"><div class="legend-color" style="background:#8e24aa;"></div> Déviation VL 2</div>',
+            PL: '<div class="legend-item" id="leg-PL"><div class="legend-color" style="background:#e91e63;"></div> Déviation PL</div>'
+        };
+
+        function updateDynamicLegend(key, increment) {
+            drawnCounters[key] += increment;
+            if (drawnCounters[key] < 0) drawnCounters[key] = 0;
+
+            const exists = document.getElementById("leg-" + key);
+            if (drawnCounters[key] > 0 && !exists) {
+                document.getElementById('legend-content').insertAdjacentHTML('beforeend', legendDefinitions[key]);
+            } else if (drawnCounters[key] === 0 && exists) {
+                exists.remove();
+            }
+
+            let totalItems = Object.values(drawnCounters).reduce((a, b) => a + b, 0);
+            document.getElementById('legend-box').style.display = totalItems > 0 ? 'block' : 'none';
+        }
+
+        function startDraw(type, color, weight) {
+            stopDraw();
+            isDrawing = true;
+            currentType = type;
+            currentOptions = { color: color, weight: weight, dashArray: type === 'Chantier' ? '10, 10' : '' };
+            map.getContainer().style.cursor = 'crosshair';
+        }
+
+        // Appel à l'API de routage OSRM
+        async function fetchRoute(p1, p2) {
+            const url = `https://router.project-osrm.org/route/v1/driving/${p1.lng},${p1.lat};${p2.lng},${p2.lat}?overview=full&geometries=geojson`;
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.routes && data.routes.length > 0) {
+                    return data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
+                }
+            } catch (err) {
+                console.error("Erreur de routage", err);
+            }
+            return [[p1.lat, p1.lng], [p2.lat, p2.lng]]; // Ligne droite de secours
+        }
+
+        map.on('click', async (e) => {
+            if (!isDrawing || isFetchingRoute) return;
+
+            if (!lastPoint) {
+                // Premier clic
+                lastPoint = e.latlng;
+                currentPathLatLngs.push([e.latlng.lat, e.latlng.lng]);
+            } else {
+                // Clics suivants : calcul de la route
+                isFetchingRoute = true;
+                map.getContainer().style.cursor = 'wait';
+                
+                const segment = await fetchRoute(lastPoint, e.latlng);
+                
+                // Ajout du segment à la géométrie totale (on retire le premier point pour éviter les doublons)
+                if(currentPathLatLngs.length > 0) segment.shift(); 
+                currentPathLatLngs.push(...segment);
+                
+                lastPoint = e.latlng;
+                
+                // Mise à jour du tracé visuel
+                if (activePolylineLayer) map.removeLayer(activePolylineLayer);
+                activePolylineLayer = L.polyline(currentPathLatLngs, currentOptions).addTo(map);
+                
+                isFetchingRoute = false;
+                map.getContainer().style.cursor = 'crosshair';
+            }
+        });
+
+        function finishDraw() {
+            if (!isDrawing || currentPathLatLngs.length < 2) { stopDraw(); return; }
+            
+            // Création d'un groupe pour lier la ligne, les flèches et les panneaux
+            const featureGroup = L.featureGroup().addTo(map);
+            const finalPolyline = L.polyline(currentPathLatLngs, currentOptions).addTo(featureGroup);
+            
+            if (currentType === 'Chantier') {
+                // Ajout automatique des panneaux aux extrémités
+                L.marker(currentPathLatLngs[0], { icon: sensInterditIcon }).addTo(featureGroup);
+                L.marker(currentPathLatLngs[currentPathLatLngs.length - 1], { icon: sensInterditIcon }).addTo(featureGroup);
+            } else {
+                // Ajout automatique des flèches pour les déviations
+                L.polylineDecorator(finalPolyline, {
+                    patterns: [
+                        { offset: '10%', repeat: '100px', symbol: L.Symbol.arrowHead({ pixelSize: 13, polygon: true, pathOptions: { stroke: false, fillOpacity: 1, fillColor: currentOptions.color }}) }
+                    ]
+                }).addTo(featureGroup);
+            }
+
+            const savedType = currentType;
+            updateDynamicLegend(savedType, 1);
+            
+            // Suppression de l'ensemble du groupe au clic-droit
+            featureGroup.on('contextmenu', () => {
+                map.removeLayer(featureGroup);
+                updateDynamicLegend(savedType, -1);
+            });
+            
+            stopDraw();
+        }
+
+        function stopDraw() {
+            isDrawing = false;
+            isFetchingRoute = false;
+            currentType = '';
+            lastPoint = null;
+            currentPathLatLngs = [];
+            if (activePolylineLayer) { map.removeLayer(activePolylineLayer); activePolylineLayer = null; }
+            map.getContainer().style.cursor = 'grab';
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') finishDraw();
+            if (e.key === 'Escape') stopDraw();
+        });
+
+        function updateBanner() {
+            document.getElementById('text-line1').innerText = document.getElementById('input-line1').value;
+            document.getElementById('text-line2').innerText = document.getElementById('input-line2').value;
+        }
+
+        function exportPlan() {
+            const zoomControl = document.querySelector('.leaflet-control-zoom');
+            if(zoomControl) zoomControl.style.display = 'none';
+
+            html2canvas(document.getElementById('export-container'), { useCORS: true, scale: 2 }).then(canvas => {
+                if(zoomControl) zoomControl.style.display = 'block';
+                const link = document.createElement('a');
+                link.download = 'Plan_Deviation_Magnetique.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }).catch(err => {
+                if(zoomControl) zoomControl.style.display = 'block';
+                alert("Erreur lors de l'exportation.");
+            });
+        }
+    </script>
+</body>
+</html>
