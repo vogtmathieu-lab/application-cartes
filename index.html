@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Générateur de Plans - Routing Magnétique V2</title>
+    <title>Générateur de Plans - Routing Magnétique V3</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -10,15 +10,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background-color: #f4f6f9; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; background-color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
         
-        #control-panel { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; flex-direction: column; gap: 15px; }
+        /* Panneau de gauche */
+        #control-panel { width: 380px; min-width: 380px; background: white; padding: 20px; box-sizing: border-box; overflow-y: auto; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 1000; display: flex; flex-direction: column; gap: 20px; }
         
-        .row-group { display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end; }
-        .input-group { display: flex; flex-direction: column; gap: 5px; }
-        input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 220px; font-size: 13px; }
+        /* Zone d'espace de travail à droite */
+        #workspace { flex-grow: 1; display: flex; justify-content: center; align-items: center; overflow: auto; padding: 20px; box-sizing: border-box; }
+
+        .section-title { font-size: 14px; font-weight: bold; color: #104169; border-bottom: 2px solid #104169; padding-bottom: 5px; margin: 0 0 10px 0; text-transform: uppercase; }
+        .input-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+        input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; font-size: 13px; }
         
-        .btn { padding: 8px 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; transition: opacity 0.2s; white-space: nowrap; }
+        .btn { padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; transition: opacity 0.2s; width: 100%; text-align: center; }
         .btn:hover { opacity: 0.8; }
         
         .btn-red { background: #d32f2f; color: white; }
@@ -29,30 +33,33 @@
         .btn-purple { background: #8e24aa; color: white; }
         .btn-pink { background: #e91e63; color: white; }
         .btn-dark { background: #37474f; color: white; }
-        .btn-validate { background: #009688; color: white; border: 2px solid #00796b; padding: 10px 15px; }
-        .btn-cancel { background: #757575; color: white; padding: 10px 15px; }
-        .btn-export { background: #ffb300; color: #000; font-size: 14px; padding: 10px 15px; margin-left: auto; }
+        .btn-danger { background: #b71c1c; color: white; }
+        
+        .btn-validate { background: #009688; color: white; border: 2px solid #00796b; margin-top: 10px; }
+        .btn-cancel { background: #757575; color: white; }
+        .btn-export { background: #ffb300; color: #000; font-size: 14px; margin-top: 20px; }
 
-        .tools-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 10px; width: 100%; border-top: 1px solid #eee; padding-top: 15px; }
-        .tool-item { display: flex; gap: 8px; align-items: center; background: #f8f9fa; padding: 5px; border-radius: 4px; border: 1px solid #e0e0e0; }
-        .tool-item input { flex-grow: 1; border: 1px solid #bbb; }
+        .tool-item { display: flex; flex-direction: column; gap: 5px; background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #e0e0e0; margin-bottom: 10px; }
+        
+        .radio-group { background: #e3f2fd; padding: 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 8px; border: 1px solid #bbdefb; font-size: 13px; margin-bottom: 10px; }
+        .radio-group label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
 
-        .radio-group { background: #e3f2fd; padding: 8px 15px; border-radius: 4px; display: flex; gap: 15px; align-items: center; border: 1px solid #bbdefb; font-size: 13px; }
-
-        #export-container { width: 1024px; height: 768px; margin: 0 auto; background: #104169; padding: 15px; box-sizing: border-box; border-radius: 4px; box-shadow: 0 10px 20px rgba(0,0,0,0.15); }
-        #banner { width: 100%; height: 90px; background: #104169; color: white; border: 3px solid white; box-sizing: border-box; }
+        /* Conteneur d'export fixe (1024x768) */
+        #export-container { width: 1024px; min-width: 1024px; height: 768px; min-height: 768px; background: #104169; padding: 15px; box-sizing: border-box; border-radius: 4px; box-shadow: 0 10px 20px rgba(0,0,0,0.15); display: flex; flex-direction: column; }
+        
+        #banner { width: 100%; height: 90px; background: #104169; color: white; border: 3px solid white; box-sizing: border-box; flex-shrink: 0; }
         .banner-table { display: table; width: 100%; height: 100%; }
         .banner-cell { display: table-cell; vertical-align: middle; }
         .banner-left { width: 140px; padding-left: 15px; text-align: left; }
         .banner-center { text-align: center; }
         .banner-right { width: 140px; }
         
-        /* Modification pour intégrer la transparence du logo */
         #logo-cea { max-height: 70px; max-width: 120px; background: transparent; display: inline-block; }
         
         #banner-text h1 { margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
         #banner-text h2 { margin: 3px 0 0 0; font-size: 16px; font-weight: 400; text-transform: uppercase; color: #ffeb3b; }
-        #map-wrapper { position: relative; width: 100%; height: 610px; margin-top: 13px; border: 3px solid white; box-sizing: border-box; }
+        
+        #map-wrapper { position: relative; width: 100%; flex-grow: 1; margin-top: 13px; border: 3px solid white; box-sizing: border-box; }
         #map { width: 100%; height: 100%; background: #cbd5e1; cursor: default; }
         
         #legend-box { display: none; position: absolute; bottom: 20px; right: 20px; background: white; border: 2px solid #104169; padding: 12px; border-radius: 4px; z-index: 1000; width: 240px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
@@ -65,26 +72,29 @@
 
     <div id="control-panel">
         
-        <div class="row-group">
+        <div>
+            <h3 class="section-title">Informations du plan</h3>
             <div class="input-group">
-                <label>Route / Commune :</label>
-                <input type="text" id="input-line1" value="D1004 - WASSELONNE" oninput="updateBanner()">
+                <label>Commune :</label>
+                <input type="text" id="input-line1" value="Commune" oninput="updateBanner()">
             </div>
             <div class="input-group">
                 <label>Nature du chantier :</label>
-                <input type="text" id="input-line2" value="TRAVAUX D'ENROBÉS DE NUIT" oninput="updateBanner()">
+                <input type="text" id="input-line2" value="Nature du chantier" oninput="updateBanner()">
             </div>
             
-            <div class="input-group" style="margin-left: 20px; padding-left: 20px; border-left: 2px solid #eee;">
+            <div class="input-group" style="margin-top: 10px;">
                 <label>Centrer la carte (Recherche) :</label>
                 <div style="display:flex; gap:5px;">
                     <input type="text" id="search-city" placeholder="Ex: Strasbourg" onkeypress="if(event.key === 'Enter') searchLocation()">
-                    <button class="btn btn-dark" onclick="searchLocation()">🔍 Aller</button>
+                    <button class="btn btn-dark" style="width: 60px;" onclick="searchLocation()">🔍</button>
                 </div>
             </div>
         </div>
 
-        <div class="tools-grid">
+        <div>
+            <h3 class="section-title">Outils de tracé</h3>
+            
             <div class="tool-item">
                 <input type="text" id="name-ChantierRouge" value="Zone de chantier (Fermée)">
                 <button class="btn btn-red" onclick="startDraw('ChantierRouge', '#d32f2f', 7)">+ Tracer</button>
@@ -94,7 +104,7 @@
                 <button class="btn btn-orange-chantier" onclick="startDraw('ChantierOrange', '#ff9800', 7)">+ Tracer</button>
             </div>
 
-            <div class="radio-group" style="grid-column: 1 / -1; margin-top: 5px;">
+            <div class="radio-group">
                 <strong>Sens des flèches (Déviations) :</strong>
                 <label><input type="radio" name="arrow-dir" value="forward" checked> Sens du tracé ➔</label>
                 <label><input type="radio" name="arrow-dir" value="backward"> Sens inverse 🡄</label>
@@ -123,249 +133,51 @@
             </div>
         </div>
         
-        <div class="row-group" style="border-top: 1px solid #eee; padding-top: 15px; align-items: center;">
-            <button class="btn btn-validate" onclick="finishDraw()">✔️ Terminer le tracé en cours</button>
-            <button class="btn btn-cancel" onclick="stopDraw()">❌ Annuler le tracé</button>
+        <div>
+            <h3 class="section-title">Validation en cours</h3>
+            <button class="btn btn-validate" onclick="finishDraw()">✔️ Terminer ce tracé</button>
+            <button class="btn btn-cancel" style="margin-top: 5px;" onclick="stopDraw()">❌ Annuler ce tracé</button>
+        </div>
+
+        <div>
+            <h3 class="section-title">Gestion Globale</h3>
+            <button class="btn btn-danger" onclick="clearAllTraces()">🗑️ Effacer tous les tracés validés</button>
             <button class="btn btn-export" onclick="exportPlan()">💾 Exporter Image (PNG)</button>
         </div>
     </div>
 
-    <div id="export-container">
-        <div id="banner">
-            <div class="banner-table">
-                <div class="banner-cell banner-left">
-                    <img id="logo-cea" src="cea-logo-rvb-vertical-fond-blanc.png" alt="Logo CeA" onerror="this.style.display='none';">
+    <div id="workspace">
+        <div id="export-container">
+            <div id="banner">
+                <div class="banner-table">
+                    <div class="banner-cell banner-left">
+                        <img id="logo-cea" src="cea-logo-rvb-vertical-fond-blanc.png" alt="Logo CeA" onerror="this.style.display='none';">
+                    </div>
+                    <div class="banner-cell banner-center" id="banner-text">
+                        <h1 id="text-line1">Commune</h1>
+                        <h2 id="text-line2">Nature du chantier</h2>
+                    </div>
+                    <div class="banner-cell banner-right"></div>
                 </div>
-                <div class="banner-cell banner-center" id="banner-text">
-                    <h1 id="text-line1">D1004 - WASSELONNE</h1>
-                    <h2 id="text-line2">TRAVAUX D'ENROBÉS DE NUIT</h2>
-                </div>
-                <div class="banner-cell banner-right"></div>
             </div>
-        </div>
 
-        <div id="map-wrapper">
-            <div id="map"></div>
-            <div id="legend-box">
-                <h3 style="margin: 0 0 10px 0; font-size: 14px; text-align: center; border-bottom: 2px solid #104169; padding-bottom: 3px;">Légende</h3>
-                <div id="legend-content"></div>
+            <div id="map-wrapper">
+                <div id="map"></div>
+                <div id="legend-box">
+                    <h3 style="margin: 0 0 10px 0; font-size: 14px; text-align: center; border-bottom: 2px solid #104169; padding-bottom: 3px;">Légende</h3>
+                    <div id="legend-content"></div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Initialisation de la carte
         const map = L.map('map', { preferCanvas: true }).setView([48.6375, 7.4481], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19, attribution: '© OpenStreetMap', crossOrigin: true
         }).addTo(map);
 
-        // API de géocodage (Recherche)
         async function searchLocation() {
             const query = document.getElementById('search-city').value;
             if (!query) return;
-            try {
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=fr`);
-                const data = await response.json();
-                if (data && data.length > 0) {
-                    map.setView([data[0].lat, data[0].lon], 13);
-                } else {
-                    alert("Commune introuvable.");
-                }
-            } catch (error) {
-                console.error("Erreur de recherche :", error);
-            }
-        }
-
-        // Pictogrammes vectoriels
-        const sensInterditIcon = L.divIcon({
-            className: 'custom-icon',
-            html: '<div style="width:20px; height:20px; background:#d32f2f; border-radius:50%; border: 2px solid white; display:flex; align-items:center; justify-content:center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"><div style="width:14px; height:3.5px; background:white;"></div></div>',
-            iconSize: [24, 24], iconAnchor: [12, 12]
-        });
-
-        const pictoTravauxIcon = L.divIcon({
-            className: 'custom-icon',
-            html: '<svg width="28" height="28" viewBox="0 0 24 24" style="filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.4));"><path d="M12 2L1 21h22L12 2zm0 3.5l8.5 14.5h-17L12 5.5z" fill="#ff9800" stroke="white" stroke-width="0.5"/><path d="M11 10h2v5h-2zM11 16h2v2h-2z" fill="black"/></svg>',
-            iconSize: [28, 28], iconAnchor: [14, 14]
-        });
-
-        // Variables d'état
-        let isDrawing = false;
-        let isFetchingRoute = false;
-        let currentType = '';
-        let currentOptions = {};
-        let lastPoint = null;
-        let currentPathLatLngs = [];
-        let activePolylineLayer = null;
-        let activeGroupId = 0;
-
-        const drawnGroups = {}; // Stockage des tracés pour la légende dynamique
-
-        // Mise à jour de la bannière
-        function updateBanner() {
-            document.getElementById('text-line1').innerText = document.getElementById('input-line1').value;
-            document.getElementById('text-line2').innerText = document.getElementById('input-line2').value;
-        }
-
-        // Formatage HTML de la légende en fonction du type
-        function getLegendHTML(type, name, color) {
-            let iconHtml = '';
-            if (type === 'ChantierRouge') {
-                iconHtml = `<div class="legend-color" style="background:transparent; border-top:4px dashed ${color}; height:0;"></div>`;
-            } else if (type === 'ChantierOrange') {
-                iconHtml = `<div class="legend-color" style="background:transparent; border-top:4px dashed ${color}; height:0;"></div>`;
-            } else {
-                iconHtml = `<div class="legend-color" style="background:${color};"></div>`;
-            }
-            return `<div class="legend-item" id="leg-${activeGroupId}">${iconHtml} <span>${name}</span></div>`;
-        }
-
-        function refreshLegend() {
-            const legendBox = document.getElementById('legend-box');
-            const legendContent = document.getElementById('legend-content');
-            legendContent.innerHTML = '';
-            
-            const keys = Object.keys(drawnGroups);
-            if (keys.length === 0) {
-                legendBox.style.display = 'none';
-            } else {
-                legendBox.style.display = 'block';
-                keys.forEach(id => {
-                    legendContent.insertAdjacentHTML('beforeend', drawnGroups[id].html);
-                });
-            }
-        }
-
-        function startDraw(type, color, weight) {
-            stopDraw();
-            isDrawing = true;
-            currentType = type;
-            
-            // Les chantiers sont systématiquement en pointillés
-            const isChantier = (type === 'ChantierRouge' || type === 'ChantierOrange');
-            currentOptions = { 
-                color: color, 
-                weight: weight, 
-                dashArray: isChantier ? '10, 10' : '' 
-            };
-            
-            map.getContainer().style.cursor = 'crosshair';
-        }
-
-        // Routing Magnétique OSRM
-        async function fetchRoute(p1, p2) {
-            const url = `https://router.project-osrm.org/route/v1/driving/${p1.lng},${p1.lat};${p2.lng},${p2.lat}?overview=full&geometries=geojson`;
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-                if (data.routes && data.routes.length > 0) {
-                    return data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
-                }
-            } catch (err) {
-                console.error("Erreur de routage", err);
-            }
-            return [[p1.lat, p1.lng], [p2.lat, p2.lng]];
-        }
-
-        map.on('click', async (e) => {
-            if (!isDrawing || isFetchingRoute) return;
-
-            if (!lastPoint) {
-                lastPoint = e.latlng;
-                currentPathLatLngs.push([e.latlng.lat, e.latlng.lng]);
-            } else {
-                isFetchingRoute = true;
-                map.getContainer().style.cursor = 'wait';
-                
-                const segment = await fetchRoute(lastPoint, e.latlng);
-                if (currentPathLatLngs.length > 0) segment.shift(); 
-                currentPathLatLngs.push(...segment);
-                
-                lastPoint = e.latlng;
-                
-                if (activePolylineLayer) map.removeLayer(activePolylineLayer);
-                activePolylineLayer = L.polyline(currentPathLatLngs, currentOptions).addTo(map);
-                
-                isFetchingRoute = false;
-                map.getContainer().style.cursor = 'crosshair';
-            }
-        });
-
-        function finishDraw() {
-            if (!isDrawing || currentPathLatLngs.length < 2) { stopDraw(); return; }
-            
-            activeGroupId++;
-            const groupId = activeGroupId;
-            const featureGroup = L.featureGroup().addTo(map);
-            const finalPolyline = L.polyline(currentPathLatLngs, currentOptions).addTo(featureGroup);
-            
-            // 1. Placement des Pictogrammes (Si Chantier)
-            if (currentType === 'ChantierRouge') {
-                L.marker(currentPathLatLngs[0], { icon: sensInterditIcon }).addTo(featureGroup);
-                L.marker(currentPathLatLngs[currentPathLatLngs.length - 1], { icon: sensInterditIcon }).addTo(featureGroup);
-            } else if (currentType === 'ChantierOrange') {
-                L.marker(currentPathLatLngs[0], { icon: pictoTravauxIcon }).addTo(featureGroup);
-                L.marker(currentPathLatLngs[currentPathLatLngs.length - 1], { icon: pictoTravauxIcon }).addTo(featureGroup);
-            } 
-            // 2. Placement des Flèches de direction élargies (Si Déviation)
-            else {
-                const arrowDir = document.querySelector('input[name="arrow-dir"]:checked').value;
-                const arrowParams = { offset: '10%', repeat: '120px', symbol: L.Symbol.arrowHead({ pixelSize: 18, polygon: true, pathOptions: { stroke: false, fillOpacity: 1, fillColor: currentOptions.color }}) };
-
-                if (arrowDir === 'forward' || arrowDir === 'both') {
-                    L.polylineDecorator(finalPolyline, { patterns: [arrowParams] }).addTo(featureGroup);
-                }
-                if (arrowDir === 'backward' || arrowDir === 'both') {
-                    const reversedLine = L.polyline([...currentPathLatLngs].reverse());
-                    L.polylineDecorator(reversedLine, { patterns: [arrowParams] }).addTo(featureGroup);
-                }
-            }
-
-            // Mise à jour de la Légende avec le nom tapé dans le champ
-            const customName = document.getElementById(`name-${currentType}`).value;
-            drawnGroups[groupId] = {
-                layer: featureGroup,
-                html: getLegendHTML(currentType, customName, currentOptions.color)
-            };
-            refreshLegend();
-            
-            // Rendre le groupe supprimable au clic droit
-            featureGroup.on('contextmenu', () => {
-                map.removeLayer(featureGroup);
-                delete drawnGroups[groupId];
-                refreshLegend();
-            });
-            
-            stopDraw();
-        }
-
-        function stopDraw() {
-            isDrawing = false;
-            isFetchingRoute = false;
-            currentType = '';
-            lastPoint = null;
-            currentPathLatLngs = [];
-            if (activePolylineLayer) { map.removeLayer(activePolylineLayer); activePolylineLayer = null; }
-            map.getContainer().style.cursor = 'grab';
-        }
-
-        // Export de l'image
-        function exportPlan() {
-            const zoomControl = document.querySelector('.leaflet-control-zoom');
-            if(zoomControl) zoomControl.style.display = 'none';
-
-            html2canvas(document.getElementById('export-container'), { useCORS: true, scale: 2, backgroundColor: null }).then(canvas => {
-                if(zoomControl) zoomControl.style.display = 'block';
-                const link = document.createElement('a');
-                link.download = 'Plan_Deviation_CeA.png';
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-            }).catch(err => {
-                if(zoomControl) zoomControl.style.display = 'block';
-                alert("Erreur lors de l'exportation.");
-            });
-        }
-    </script>
-</body>
-</html>
+            try
