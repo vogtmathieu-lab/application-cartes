@@ -2,55 +2,57 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Générateur de Plans - Routing Magnétique V3.1</title>
+    <title>Générateur de plans de déviation</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; background-color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
         
-        /* Panneau de gauche */
-        #control-panel { width: 380px; min-width: 380px; background: white; padding: 20px; box-sizing: border-box; overflow-y: auto; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 1000; display: flex; flex-direction: column; gap: 20px; }
+        #control-panel { width: 400px; min-width: 400px; background: white; padding: 20px; box-sizing: border-box; overflow-y: auto; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 1000; display: flex; flex-direction: column; gap: 15px; }
         
-        /* Zone d'espace de travail à droite */
-        #workspace { flex-grow: 1; display: flex; justify-content: center; align-items: center; overflow: auto; padding: 20px; box-sizing: border-box; }
+        #workspace { flex-grow: 1; overflow: auto; position: relative; }
+        #workspace-inner { display: flex; justify-content: center; align-items: flex-start; min-height: 100%; padding: 20px; box-sizing: border-box; }
 
         .section-title { font-size: 14px; font-weight: bold; color: #104169; border-bottom: 2px solid #104169; padding-bottom: 5px; margin: 0 0 10px 0; text-transform: uppercase; }
         .input-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
-        input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; font-size: 13px; }
+        .input-group label { font-size: 12px; font-weight: bold; color: #333; }
+        input[type="text"], select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; font-size: 13px; }
         
-        .btn { padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; transition: opacity 0.2s; width: 100%; text-align: center; }
+        .btn { padding: 8px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; transition: opacity 0.2s; text-align: center; display: block; width: 100%; }
         .btn:hover { opacity: 0.8; }
         
         .btn-red { background: #d32f2f; color: white; }
         .btn-orange-chantier { background: #ff9800; color: white; }
         .btn-green { background: #2e7d32; color: white; }
         .btn-blue { background: #1565c0; color: white; }
-        .btn-orange { background: #e65100; color: white; }
         .btn-purple { background: #8e24aa; color: white; }
-        .btn-pink { background: #e91e63; color: white; }
-        .btn-dark { background: #37474f; color: white; }
-        .btn-danger { background: #b71c1c; color: white; }
         
-        .btn-validate { background: #009688; color: white; border: 2px solid #00796b; margin-top: 10px; }
+        .btn-validate { background: #009688; color: white; border: 1px solid #00796b; }
         .btn-cancel { background: #757575; color: white; }
-        .btn-export { background: #ffb300; color: #000; font-size: 14px; margin-top: 20px; }
+        .btn-danger { background: #b71c1c; color: white; padding: 10px; margin-bottom: 5px;}
+        .btn-export { background: #ffb300; color: #000; padding: 10px; margin-bottom: 5px;}
+        .btn-dark { background: #37474f; color: white; margin-bottom: 5px; }
 
-        .tool-item { display: flex; flex-direction: column; gap: 5px; background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #e0e0e0; margin-bottom: 10px; }
-        
-        .radio-group { background: #e3f2fd; padding: 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 8px; border: 1px solid #bbdefb; font-size: 13px; margin-bottom: 10px; }
-        .radio-group label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+        .tool-item { display: flex; flex-direction: column; gap: 8px; background: #f8f9fa; padding: 12px; border-radius: 6px; border: 1px solid #e0e0e0; margin-bottom: 10px; }
+        .tool-actions-split { display: flex; gap: 5px; width: 100%; }
+        .tool-actions-split .btn { flex: 1; font-size: 11px; padding: 8px 4px; }
 
-        /* Conteneur d'export fixe (1024x768) */
-        #export-container { width: 1024px; min-width: 1024px; height: 768px; min-height: 768px; background: #104169; padding: 15px; box-sizing: border-box; border-radius: 4px; box-shadow: 0 10px 20px rgba(0,0,0,0.15); display: flex; flex-direction: column; }
+        .radio-inline { display: flex; gap: 10px; font-size: 12px; background: #e3f2fd; padding: 6px 10px; border-radius: 4px; border: 1px solid #bbdefb; }
+        .radio-inline label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
+        #export-container { background: #104169; padding: 20px; box-sizing: border-box; border-radius: 2px; box-shadow: 0 10px 20px rgba(0,0,0,0.15); display: flex; flex-direction: column; }
+        #export-container.landscape { width: 1123px; min-width: 1123px; height: 794px; min-height: 794px; }
+        #export-container.portrait { width: 794px; min-width: 794px; height: 1123px; min-height: 1123px; }
         
-        #banner { width: 100%; height: 90px; background: #104169; color: white; border: 3px solid white; box-sizing: border-box; flex-shrink: 0; }
+        #banner { width: 100%; height: 90px; background: #104169; color: white; box-sizing: border-box; flex-shrink: 0; }
         .banner-table { display: table; width: 100%; height: 100%; }
         .banner-cell { display: table-cell; vertical-align: middle; }
-        .banner-left { width: 140px; padding-left: 15px; text-align: left; }
+        .banner-left { width: 140px; padding-left: 20px; text-align: left; }
         .banner-center { text-align: center; }
         .banner-right { width: 140px; }
         
@@ -59,14 +61,17 @@
         #banner-text h1 { margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
         #banner-text h2 { margin: 3px 0 0 0; font-size: 16px; font-weight: 400; text-transform: uppercase; color: #ffeb3b; }
         
-        /* CORRECTION : Hauteur fixe pour la carte */
-        #map-wrapper { position: relative; width: 100%; height: 630px; margin-top: 13px; border: 3px solid white; box-sizing: border-box; }
+        #map-wrapper { position: relative; width: 100%; margin-top: 20px; box-sizing: border-box; border-radius: 4px; overflow: hidden; flex-grow: 1; }
         #map { width: 100%; height: 100%; background: #cbd5e1; cursor: default; }
         
         #legend-box { display: none; position: absolute; bottom: 20px; right: 20px; background: white; border: 2px solid #104169; padding: 12px; border-radius: 4px; z-index: 1000; width: 240px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
         .legend-item { display: flex; align-items: center; margin-bottom: 7px; font-size: 11px; font-weight: bold; line-height: 1.2; }
         .legend-color { width: 30px; height: 6px; margin-right: 10px; border-radius: 2px; flex-shrink: 0; }
-        .legend-icon { width: 24px; height: 24px; margin-right: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+        /* Style spécifique pour forcer la transparence du conteneur des icônes SVG */
+        .custom-arrow-icon { background: none !important; border: none !important; }
+
+        #app-footer { position: fixed; bottom: 10px; right: 15px; font-size: 12px; font-weight: bold; color: #555; background: rgba(255,255,255,0.9); padding: 5px 10px; border-radius: 4px; z-index: 2000; pointer-events: none; border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body>
@@ -75,104 +80,143 @@
         <div>
             <h3 class="section-title">Informations du plan</h3>
             <div class="input-group">
-                <label>Commune :</label>
-                <input type="text" id="input-line1" value="Commune" oninput="updateBanner()">
+                <label>RD - commune :</label>
+                <input type="text" id="input-line1" value="A renseigner" oninput="updateBanner()">
             </div>
             <div class="input-group">
                 <label>Nature du chantier :</label>
-                <input type="text" id="input-line2" value="Nature du chantier" oninput="updateBanner()">
+                <input type="text" id="input-line2" value="A renseigner" oninput="updateBanner()">
             </div>
             
-            <div class="input-group" style="margin-top: 10px;">
-                <label>Centrer la carte (Recherche) :</label>
+            <div class="input-group" style="margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 10px;">
+                <label>Centrer la carte :</label>
                 <div style="display:flex; gap:5px;">
                     <input type="text" id="search-city" placeholder="Ex: Strasbourg" onkeypress="if(event.key === 'Enter') searchLocation()">
-                    <button class="btn btn-dark" style="width: 60px;" onclick="searchLocation()">🔍</button>
+                    <button class="btn btn-dark" style="width: 50px;" onclick="searchLocation()">🔍</button>
                 </div>
             </div>
         </div>
 
         <div>
-            <h3 class="section-title">Outils de tracé</h3>
-            
+            <h3 class="section-title">Tracé de la zone chantier</h3>
             <div class="tool-item">
                 <input type="text" id="name-ChantierRouge" value="Zone de chantier (Fermée)">
-                <button class="btn btn-red" onclick="startDraw('ChantierRouge', '#d32f2f', 7)">+ Tracer</button>
+                <button class="btn btn-red" onclick="startDraw('ChantierRouge', '#d32f2f', 5)">Tracer la section</button>
+                <div class="tool-actions-split">
+                    <button class="btn btn-validate" onclick="finishSpecificType('ChantierRouge')">✔️ Terminer ce tracé</button>
+                    <button class="btn btn-cancel" onclick="cancelSpecificType('ChantierRouge')">❌ Annuler ce tracé</button>
+                </div>
             </div>
+
             <div class="tool-item">
                 <input type="text" id="name-ChantierOrange" value="Zone de chantier (Travaux)">
-                <button class="btn btn-orange-chantier" onclick="startDraw('ChantierOrange', '#ff9800', 7)">+ Tracer</button>
+                <button class="btn btn-orange-chantier" onclick="startDraw('ChantierOrange', '#ff9800', 5)">Tracer la section</button>
+                <div class="tool-actions-split">
+                    <button class="btn btn-validate" onclick="finishSpecificType('ChantierOrange')">✔️ Terminer ce tracé</button>
+                    <button class="btn btn-cancel" onclick="cancelSpecificType('ChantierOrange')">❌ Annuler ce tracé</button>
+                </div>
             </div>
-
-            <div class="radio-group">
-                <strong>Sens des flèches (Déviations) :</strong>
-                <label><input type="radio" name="arrow-dir" value="forward" checked> Sens du tracé ➔</label>
-                <label><input type="radio" name="arrow-dir" value="backward"> Sens inverse 🡄</label>
-                <label><input type="radio" name="arrow-dir" value="both"> Double sens ⮂</label>
-            </div>
-
-            <div class="tool-item">
-                <input type="text" id="name-PP" value="Déviation principale (PP)">
-                <button class="btn btn-green" onclick="startDraw('PP', '#2e7d32', 5)">+ Tracer</button>
-            </div>
-            <div class="tool-item">
-                <input type="text" id="name-SEC" value="Déviation secondaire (SEC)">
-                <button class="btn btn-blue" onclick="startDraw('SEC', '#1565c0', 5)">+ Tracer</button>
-            </div>
-            <div class="tool-item">
-                <input type="text" id="name-VL1" value="Déviation VL 1">
-                <button class="btn btn-orange" onclick="startDraw('VL1', '#e65100', 5)">+ Tracer</button>
-            </div>
-            <div class="tool-item">
-                <input type="text" id="name-VL2" value="Déviation VL 2">
-                <button class="btn btn-purple" onclick="startDraw('VL2', '#8e24aa', 5)">+ Tracer</button>
-            </div>
-            <div class="tool-item">
-                <input type="text" id="name-PL" value="Déviation PL">
-                <button class="btn btn-pink" onclick="startDraw('PL', '#e91e63', 5)">+ Tracer</button>
-            </div>
-        </div>
-        
-        <div>
-            <h3 class="section-title">Validation en cours</h3>
-            <button class="btn btn-validate" onclick="finishDraw()">✔️ Terminer ce tracé</button>
-            <button class="btn btn-cancel" style="margin-top: 5px;" onclick="stopDraw()">❌ Annuler ce tracé</button>
         </div>
 
         <div>
+            <h3 class="section-title">Tracer les déviations</h3>
+            <div class="tool-item">
+                <input type="text" id="name-DevVert" value="Déviation principale (Verte)">
+                <div class="radio-inline">
+                    <label><input type="radio" name="arr-DevVert" value="forward" checked> ➔ Normal</label>
+                    <label><input type="radio" name="arr-DevVert" value="backward"> ⬅ Inverse</label>
+                    <label><input type="radio" name="arr-DevVert" value="both"> ⇄ Double</label>
+                </div>
+                <button class="btn btn-green" onclick="startDraw('DevVert', '#2e7d32', 4)">Tracer la section</button>
+                <div class="tool-actions-split">
+                    <button class="btn btn-validate" onclick="finishSpecificType('DevVert')">✔️ Terminer ce tracé</button>
+                    <button class="btn btn-cancel" onclick="cancelSpecificType('DevVert')">❌ Annuler ce tracé</button>
+                </div>
+            </div>
+
+            <div class="tool-item">
+                <input type="text" id="name-DevBleu" value="Déviation secondaire (Bleue)">
+                <div class="radio-inline">
+                    <label><input type="radio" name="arr-DevBleu" value="forward" checked> ➔ Normal</label>
+                    <label><input type="radio" name="arr-DevBleu" value="backward"> ⬅ Inverse</label>
+                    <label><input type="radio" name="arr-DevBleu" value="both"> ⇄ Double</label>
+                </div>
+                <button class="btn btn-blue" onclick="startDraw('DevBleu', '#1565c0', 4)">Tracer la section</button>
+                <div class="tool-actions-split">
+                    <button class="btn btn-validate" onclick="finishSpecificType('DevBleu')">✔️ Terminer ce tracé</button>
+                    <button class="btn btn-cancel" onclick="cancelSpecificType('DevBleu')">❌ Annuler ce tracé</button>
+                </div>
+            </div>
+
+            <div class="tool-item">
+                <input type="text" id="name-DevViolet" value="Déviation locale (Violette)">
+                <div class="radio-inline">
+                    <label><input type="radio" name="arr-DevViolet" value="forward" checked> ➔ Normal</label>
+                    <label><input type="radio" name="arr-DevViolet" value="backward"> ⬅ Inverse</label>
+                    <label><input type="radio" name="arr-DevViolet" value="both"> ⇄ Double</label>
+                </div>
+                <button class="btn btn-purple" onclick="startDraw('DevViolet', '#8e24aa', 4)">Tracer la section</button>
+                <div class="tool-actions-split">
+                    <button class="btn btn-validate" onclick="finishSpecificType('DevViolet')">✔️ Terminer ce tracé</button>
+                    <button class="btn btn-cancel" onclick="cancelSpecificType('DevViolet')">❌ Annuler ce tracé</button>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: auto; padding-top: 15px;">
             <h3 class="section-title">Gestion Globale</h3>
-            <button class="btn btn-danger" onclick="clearAllTraces()">🗑️ Effacer tous les tracés validés</button>
-            <button class="btn btn-export" onclick="exportPlan()">💾 Exporter Image (PNG)</button>
+            
+            <div class="input-group">
+                <label>Format d'impression :</label>
+                <select id="format-plan" onchange="changeFormat()">
+                    <option value="landscape">Paysage (A4)</option>
+                    <option value="portrait">Portrait (A4)</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                <input type="file" id="import-json" style="display:none" accept=".json" onchange="importJSON(event)">
+                <button class="btn btn-dark" style="flex: 1;" onclick="document.getElementById('import-json').click()">📂 Importer JSON</button>
+                <button class="btn btn-dark" style="flex: 1;" onclick="exportJSON()">💾 Exporter JSON</button>
+            </div>
+
+            <button class="btn btn-export" onclick="exportPDF()">📄 Exporter en PDF</button>
+            <button class="btn btn-export" style="background:#fff59d;" onclick="exportPlan()">🖼️ Exporter Image</button>
+            <button class="btn btn-danger" style="margin-top: 15px;" onclick="clearAllTraces()">🗑️ Effacer toute la carte</button>
         </div>
     </div>
 
     <div id="workspace">
-        <div id="export-container">
-            <div id="banner">
-                <div class="banner-table">
-                    <div class="banner-cell banner-left">
-                        <img id="logo-cea" src="cea-logo-rvb-vertical-fond-blanc.png" alt="Logo CeA" onerror="this.style.display='none';">
+        <div id="workspace-inner">
+            <div id="export-container" class="landscape">
+                <div id="banner">
+                    <div class="banner-table">
+                        <div class="banner-cell banner-left">
+                            <img id="logo-cea" src="cea-logo-rvb-vertical-fond-blanc.png" alt="Logo CeA" onerror="this.style.display='none';">
+                        </div>
+                        <div class="banner-cell banner-center" id="banner-text">
+                            <h1 id="text-line1">A renseigner</h1>
+                            <h2 id="text-line2">A renseigner</h2>
+                        </div>
+                        <div class="banner-cell banner-right"></div>
                     </div>
-                    <div class="banner-cell banner-center" id="banner-text">
-                        <h1 id="text-line1">Commune</h1>
-                        <h2 id="text-line2">Nature du chantier</h2>
-                    </div>
-                    <div class="banner-cell banner-right"></div>
                 </div>
-            </div>
 
-            <div id="map-wrapper">
-                <div id="map"></div>
-                <div id="legend-box">
-                    <h3 style="margin: 0 0 10px 0; font-size: 14px; text-align: center; border-bottom: 2px solid #104169; padding-bottom: 3px;">Légende</h3>
-                    <div id="legend-content"></div>
+                <div id="map-wrapper">
+                    <div id="map"></div>
+                    <div id="legend-box">
+                        <h3 style="margin: 0 0 10px 0; font-size: 14px; text-align: center; border-bottom: 2px solid #104169; padding-bottom: 3px;">Légende</h3>
+                        <div id="legend-content"></div>
+                    </div>
                 </div>
             </div>
         </div>
+        
+        <div id="app-footer">Création / maintenance de l’application CeA / SGT / UPC / M. VOGT</div>
     </div>
 
     <script>
-        const map = L.map('map', { preferCanvas: true }).setView([48.6375, 7.4481], 13);
+        const map = L.map('map', { preferCanvas: true }).setView([48.2500, 7.4500], 9);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19, attribution: '© OpenStreetMap', crossOrigin: true
         }).addTo(map);
@@ -189,7 +233,7 @@
                     alert("Commune introuvable.");
                 }
             } catch (error) {
-                console.error("Erreur de recherche :", error);
+                console.error("Erreur :", error);
             }
         }
 
@@ -201,9 +245,23 @@
 
         const pictoTravauxIcon = L.divIcon({
             className: 'custom-icon',
-            html: '<svg width="28" height="28" viewBox="0 0 24 24" style="filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.4));"><path d="M12 2L1 21h22L12 2zm0 3.5l8.5 14.5h-17L12 5.5z" fill="#ff9800" stroke="white" stroke-width="0.5"/><path d="M11 10h2v5h-2zM11 16h2v2h-2z" fill="black"/></svg>',
+            html: '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" style="filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.4));"><path d="M12 2L1 21h22L12 2zm0 3.5l8.5 14.5h-17L12 5.5z" fill="#ff9800" stroke="white" stroke-width="1"/><path d="M11 10h2v5h-2zM11 16h2v2h-2z" fill="black"/></svg>',
             iconSize: [28, 28], iconAnchor: [14, 14]
         });
+
+        // NOUVEAU MOTEUR SVG : Les flèches pointent par défaut vers le Nord (Haut) et le Sud (Bas)
+        function getArrowIcon(color, direction) {
+            let points = direction === 'forward' 
+                ? "2,16 8,0 14,16 8,12"   // Pointe vers le haut (Nord)
+                : "2,0 8,16 14,0 8,4";    // Pointe vers le bas (Sud)
+                
+            return L.divIcon({
+                className: 'custom-arrow-icon',
+                html: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><polygon points="${points}" fill="${color}"/></svg>`,
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+            });
+        }
 
         let isDrawing = false;
         let isFetchingRoute = false;
@@ -215,6 +273,13 @@
         let activeGroupId = 0;
 
         const drawnGroups = {}; 
+
+        function changeFormat() {
+            const format = document.getElementById('format-plan').value;
+            const container = document.getElementById('export-container');
+            container.className = format;
+            setTimeout(() => map.invalidateSize(), 300);
+        }
 
         function updateBanner() {
             document.getElementById('text-line1').innerText = document.getElementById('input-line1').value;
@@ -247,15 +312,12 @@
             }
         }
 
-        function clearAllTraces() {
-            if(confirm("Êtes-vous sûr de vouloir effacer tous les tracés validés sur la carte ?")) {
-                for (let id in drawnGroups) {
-                    map.removeLayer(drawnGroups[id].layer);
-                }
-                for (let key in drawnGroups) { 
-                    delete drawnGroups[key]; 
-                }
-                activeGroupId = 0;
+        function clearAllTraces(force = false) {
+            if(force || confirm("Effacer toute la carte ?")) {
+                for (let id in drawnGroups) { map.removeLayer(drawnGroups[id].layer); }
+                for (let key in drawnGroups) { delete drawnGroups[key]; }
+                if (activePolylineLayer) { map.removeLayer(activePolylineLayer); activePolylineLayer = null; }
+                isDrawing = false;
                 refreshLegend();
             }
         }
@@ -265,7 +327,7 @@
             isDrawing = true;
             currentType = type;
             const isChantier = (type === 'ChantierRouge' || type === 'ChantierOrange');
-            currentOptions = { color: color, weight: weight, dashArray: isChantier ? '10, 10' : '' };
+            currentOptions = { color: color, weight: weight, dashArray: isChantier ? '10, 10' : null };
             map.getContainer().style.cursor = 'crosshair';
         }
 
@@ -307,36 +369,62 @@
             }
         });
 
-        function finishDraw() {
-            if (!isDrawing || currentPathLatLngs.length < 2) { stopDraw(); return; }
-            
-            activeGroupId++;
-            const groupId = activeGroupId;
-            const featureGroup = L.featureGroup().addTo(map);
-            const finalPolyline = L.polyline(currentPathLatLngs, currentOptions).addTo(featureGroup);
-            
-            if (currentType === 'ChantierRouge') {
-                L.marker(currentPathLatLngs[0], { icon: sensInterditIcon }).addTo(featureGroup);
-                L.marker(currentPathLatLngs[currentPathLatLngs.length - 1], { icon: sensInterditIcon }).addTo(featureGroup);
-            } else if (currentType === 'ChantierOrange') {
-                L.marker(currentPathLatLngs[0], { icon: pictoTravauxIcon }).addTo(featureGroup);
-                L.marker(currentPathLatLngs[currentPathLatLngs.length - 1], { icon: pictoTravauxIcon }).addTo(featureGroup);
-            } 
-            else {
-                const arrowDir = document.querySelector('input[name="arrow-dir"]:checked').value;
-                const arrowParams = { offset: '10%', repeat: '120px', symbol: L.Symbol.arrowHead({ pixelSize: 18, polygon: true, pathOptions: { stroke: false, fillOpacity: 1, fillColor: currentOptions.color }}) };
+        function finishSpecificType(type) {
+            if (isDrawing && currentType === type) { finishDraw(); }
+        }
 
-                if (arrowDir === 'forward' || arrowDir === 'both') {
-                    L.polylineDecorator(finalPolyline, { patterns: [arrowParams] }).addTo(featureGroup);
+        function cancelSpecificType(type) {
+            if (isDrawing && currentType === type) {
+                stopDraw();
+            } else {
+                let maxId = -1;
+                for (let id in drawnGroups) {
+                    if (drawnGroups[id].type === type && parseInt(id) > maxId) {
+                        maxId = parseInt(id);
+                    }
                 }
-                if (arrowDir === 'backward' || arrowDir === 'both') {
-                    const reversedLine = L.polyline([...currentPathLatLngs].reverse());
-                    L.polylineDecorator(reversedLine, { patterns: [arrowParams] }).addTo(featureGroup);
+                if (maxId !== -1) {
+                    map.removeLayer(drawnGroups[maxId].layer);
+                    delete drawnGroups[maxId];
+                    refreshLegend();
                 }
             }
+        }
 
-            const customName = document.getElementById(`name-${currentType}`).value;
-            drawnGroups[groupId] = { layer: featureGroup, html: getLegendHTML(currentType, customName, currentOptions.color) };
+        function buildTraceLayer(traceData, groupId) {
+            const featureGroup = L.featureGroup().addTo(map);
+            const finalPolyline = L.polyline(traceData.latlngs, traceData.options).addTo(featureGroup);
+            
+            if (traceData.type === 'ChantierRouge') {
+                L.marker(traceData.latlngs[0], { icon: sensInterditIcon }).addTo(featureGroup);
+                L.marker(traceData.latlngs[traceData.latlngs.length - 1], { icon: sensInterditIcon }).addTo(featureGroup);
+            } else if (traceData.type === 'ChantierOrange') {
+                L.marker(traceData.latlngs[0], { icon: pictoTravauxIcon }).addTo(featureGroup);
+                L.marker(traceData.latlngs[traceData.latlngs.length - 1], { icon: pictoTravauxIcon }).addTo(featureGroup);
+            } else {
+                let patterns = [];
+                // La distance fixe garantit qu'il n'y a jamais de chevauchement
+                if (traceData.arrowDir === 'forward') {
+                    patterns.push({ offset: '10%', repeat: '120px', symbol: L.Symbol.marker({ rotate: true, markerOptions: { icon: getArrowIcon(traceData.options.color, 'forward') }}) });
+                } else if (traceData.arrowDir === 'backward') {
+                    patterns.push({ offset: '10%', repeat: '120px', symbol: L.Symbol.marker({ rotate: true, markerOptions: { icon: getArrowIcon(traceData.options.color, 'backward') }}) });
+                } else if (traceData.arrowDir === 'both') {
+                    patterns.push({ offset: '20px', repeat: '140px', symbol: L.Symbol.marker({ rotate: true, markerOptions: { icon: getArrowIcon(traceData.options.color, 'forward') }}) });
+                    patterns.push({ offset: '90px', repeat: '140px', symbol: L.Symbol.marker({ rotate: true, markerOptions: { icon: getArrowIcon(traceData.options.color, 'backward') }}) });
+                }
+                L.polylineDecorator(finalPolyline, { patterns: patterns }).addTo(featureGroup);
+            }
+
+            drawnGroups[groupId] = { 
+                layer: featureGroup, 
+                html: getLegendHTML(traceData.type, traceData.name, traceData.options.color), 
+                type: traceData.type,
+                name: traceData.name,
+                options: traceData.options,
+                latlngs: traceData.latlngs,
+                arrowDir: traceData.arrowDir
+            };
+            
             refreshLegend();
             
             featureGroup.on('contextmenu', () => {
@@ -344,11 +432,30 @@
                 delete drawnGroups[groupId];
                 refreshLegend();
             });
+        }
+
+        function finishDraw() {
+            if (!isDrawing || currentPathLatLngs.length < 2) { stopDraw(); return; }
             
+            activeGroupId++;
+            const customName = document.getElementById(`name-${currentType}`).value;
+            const selectElement = document.querySelector(`input[name="arr-${currentType}"]:checked`);
+            const arrowDir = selectElement ? selectElement.value : 'forward';
+
+            const traceData = {
+                type: currentType,
+                name: customName,
+                options: currentOptions,
+                latlngs: [...currentPathLatLngs],
+                arrowDir: arrowDir
+            };
+
+            buildTraceLayer(traceData, activeGroupId);
             stopDraw();
         }
 
         function stopDraw() {
+            if (!isDrawing) return;
             isDrawing = false;
             isFetchingRoute = false;
             currentType = '';
@@ -358,19 +465,105 @@
             map.getContainer().style.cursor = 'grab';
         }
 
+        function exportJSON() {
+            const projectData = {
+                line1: document.getElementById('input-line1').value,
+                line2: document.getElementById('input-line2').value,
+                format: document.getElementById('format-plan').value,
+                mapCenter: map.getCenter(),
+                mapZoom: map.getZoom(),
+                traces: Object.values(drawnGroups).map(g => ({
+                    type: g.type, name: g.name, options: g.options, latlngs: g.latlngs, arrowDir: g.arrowDir
+                }))
+            };
+            const blob = new Blob([JSON.stringify(projectData)], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "Sauvegarde_Plan_CeA.json";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    document.getElementById('input-line1').value = data.line1 || "A renseigner";
+                    document.getElementById('input-line2').value = data.line2 || "A renseigner";
+                    updateBanner();
+                    
+                    if (data.format) {
+                        document.getElementById('format-plan').value = data.format;
+                        changeFormat();
+                    }
+
+                    clearAllTraces(true);
+
+                    if (data.traces) {
+                        data.traces.forEach(trace => {
+                            activeGroupId++;
+                            buildTraceLayer(trace, activeGroupId);
+                        });
+                    }
+
+                    if (data.mapCenter && data.mapZoom) {
+                        setTimeout(() => {
+                            map.setView([data.mapCenter.lat, data.mapCenter.lng], data.mapZoom);
+                        }, 400);
+                    }
+                } catch (error) {
+                    alert("Fichier JSON invalide ou corrompu.");
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; 
+        }
+
         function exportPlan() {
             const zoomControl = document.querySelector('.leaflet-control-zoom');
             if(zoomControl) zoomControl.style.display = 'none';
 
-            html2canvas(document.getElementById('export-container'), { useCORS: true, scale: 2, backgroundColor: null }).then(canvas => {
+            html2canvas(document.getElementById('export-container'), { useCORS: true, scale: 2, backgroundColor: '#ffffff' }).then(canvas => {
                 if(zoomControl) zoomControl.style.display = 'block';
                 const link = document.createElement('a');
                 link.download = 'Plan_Deviation_CeA.png';
                 link.href = canvas.toDataURL('image/png');
                 link.click();
+            });
+        }
+
+        function exportPDF() {
+            const zoomControl = document.querySelector('.leaflet-control-zoom');
+            if(zoomControl) zoomControl.style.display = 'none';
+
+            const container = document.getElementById('export-container');
+
+            html2canvas(container, { useCORS: true, scale: 2, backgroundColor: '#ffffff' }).then(canvas => {
+                if(zoomControl) zoomControl.style.display = 'block';
+                
+                try {
+                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                    const orientation = document.getElementById('format-plan').value === 'portrait' ? 'p' : 'l';
+                    
+                    const pdf = new window.jspdf.jsPDF(orientation, 'mm', 'a4');
+                    
+                    const width = orientation === 'p' ? 210 : 297;
+                    const height = orientation === 'p' ? 297 : 210;
+                    
+                    pdf.addImage(imgData, 'JPEG', 0, 0, width, height);
+                    pdf.save('Plan_Deviation_CeA.pdf');
+                } catch (error) {
+                    console.error(error);
+                    alert("Erreur de création PDF. Le fichier est peut-être trop grand.");
+                }
             }).catch(err => {
                 if(zoomControl) zoomControl.style.display = 'block';
-                alert("Erreur lors de l'exportation.");
+                console.error(err);
+                alert("Erreur lors de la capture PDF.");
             });
         }
 
